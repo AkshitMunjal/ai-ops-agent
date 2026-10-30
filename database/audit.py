@@ -5,7 +5,8 @@ from database.session import open_session
 
 
 def write_audit_log(who, tool_name, tool_input, outcome):
-    tool_input_as_text = json.dumps(tool_input)
+
+    tool_input_as_text = json.dumps(tool_input, default=str)
 
     audit_row = AuditLog(
         who=who,
