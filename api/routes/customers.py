@@ -18,12 +18,18 @@ def customer_to_dictionary(customer):
 
 
 @router.get("/customers")
-def list_customers():
-    select_all_customers = select(Customer)
+def list_customers(name: str | None = None):
+    select_customers = select(Customer)
+
+    if name is not None:
+        name_pattern = "%" + name + "%"
+        name_condition = Customer.name.ilike(name_pattern)
+        select_customers = select_customers.where(name_condition)
+
     customers_as_dictionaries = []
 
     with open_session() as database_session:
-        customer_rows = database_session.scalars(select_all_customers)
+        customer_rows = database_session.scalars(select_customers)
 
         for customer in customer_rows:
             customer_dictionary = customer_to_dictionary(customer)

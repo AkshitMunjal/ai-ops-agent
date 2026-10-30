@@ -4,3 +4,4 @@ from database.models.product import Product
 from database.models.order import Order
 from database.models.order_item import OrderItem
 from database.models.invoice import Invoice
+from database.models.audit_log import AuditLog

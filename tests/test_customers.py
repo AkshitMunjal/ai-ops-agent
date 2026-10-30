@@ -38,3 +38,20 @@ def test_create_customer_without_email_is_refused_and_not_saved(client):
     customers = list_response.json()
 
     assert len(customers) == 2
+
+def test_search_customers_by_name_finds_gupta(client):
+    response = client.get("/customers", params={"name": "gupta"})
+    customers = response.json()
+    first_customer = customers[0]
+
+    assert response.status_code == 200
+    assert len(customers) == 1
+    assert first_customer["name"] == "Gupta Stores"
+
+
+def test_search_customers_with_no_match_returns_empty_list(client):
+    response = client.get("/customers", params={"name": "nobody"})
+    customers = response.json()
+
+    assert response.status_code == 200
+    assert len(customers) == 0

@@ -20,12 +20,18 @@ def product_to_dictionary(product):
 
 
 @router.get("/products")
-def list_products():
-    select_all_products = select(Product)
+def list_products(name: str | None = None):
+    select_products = select(Product)
+
+    if name is not None:
+        name_pattern = "%" + name + "%"
+        name_condition = Product.name.ilike(name_pattern)
+        select_products = select_products.where(name_condition)
+
     products_as_dictionaries = []
 
     with open_session() as database_session:
-        product_rows = database_session.scalars(select_all_products)
+        product_rows = database_session.scalars(select_products)
 
         for product in product_rows:
             product_dictionary = product_to_dictionary(product)

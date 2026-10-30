@@ -30,3 +30,20 @@ def test_get_missing_product_returns_404(client):
     response = client.get("/products/99")
 
     assert response.status_code == 404
+
+def test_search_products_by_name_finds_pvc_pipe(client):
+    response = client.get("/products", params={"name": "pipe"})
+    products = response.json()
+    first_product = products[0]
+
+    assert response.status_code == 200
+    assert len(products) == 1
+    assert first_product["name"] == "PVC Pipe 1 inch (3m)"
+
+
+def test_search_products_with_no_match_returns_empty_list(client):
+    response = client.get("/products", params={"name": "nothing"})
+    products = response.json()
+
+    assert response.status_code == 200
+    assert len(products) == 0
