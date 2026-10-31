@@ -1,6 +1,8 @@
 import os
 
 os.environ["DATABASE_URL"] = "sqlite:///test_erp.db"
+os.environ["AGENT_DATABASE_URL"] = "sqlite:///test_agent.db"
+os.environ["CHECKPOINT_DB"] = "test_agent_checkpoints.db"
 
 import pytest
 from fastapi.testclient import TestClient
