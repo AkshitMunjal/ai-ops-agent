@@ -1,24 +1,17 @@
 import httpx
 import streamlit as st
 
-from ui.agent_api_client import get_run_detail, get_waiting_runs, send_decision
+from ui.agent_api_client import (
+    dismiss_run,
+    get_run_detail,
+    get_runs,
+    send_decision,
+)
 
-st.set_page_config(page_title="Order approvals", layout="centered")
-st.title("Orders waiting for approval")
+review_statuses = ["needs_review", "error", "approval_failed"]
 
-if st.button("Refresh"):
-    st.rerun()
 
-try:
-    waiting_runs = get_waiting_runs()
-except httpx.HTTPError:
-    st.error("Cannot reach the agent service. Is it running on port 8001?")
-    st.stop()
-
-if not waiting_runs:
-    st.success("Nothing is waiting. All emails are handled.")
-
-for run in waiting_runs:
+def show_waiting_run(run):
     run_id = run["id"]
     run_detail = get_run_detail(run_id)
     understood = run_detail["understood"]
@@ -56,3 +49,58 @@ for run in waiting_runs:
                 st.error(f"The decision could not be saved: {error}")
             else:
                 st.rerun()
+
+
+def show_review_run(run):
+    run_id = run["id"]
+
+    with st.container(border=True):
+        st.subheader(f"Run {run_id}: {run['status']}")
+
+        st.caption("Original email")
+        st.text(run["email_text"])
+
+        st.caption("What went wrong")
+        if run["problems"]:
+            st.error(run["problems"])
+        else:
+            st.error("No reason was saved for this run.")
+
+        clicked_dismiss = st.button("Dismiss", key=f"dismiss-{run_id}")
+        if clicked_dismiss:
+            try:
+                dismiss_run(run_id)
+            except httpx.HTTPError as error:
+                st.error(f"The run could not be dismissed: {error}")
+            else:
+                st.rerun()
+
+
+st.set_page_config(page_title="Order approvals", layout="centered")
+st.title("Order approvals")
+
+if st.button("Refresh"):
+    st.rerun()
+
+try:
+    waiting_runs = get_runs("waiting_for_approval")
+    review_runs = []
+    for status in review_statuses:
+        review_runs.extend(get_runs(status))
+except httpx.HTTPError:
+    st.error("Cannot reach the agent service. Is it running on port 8001?")
+    st.stop()
+
+st.header("Waiting for approval")
+if not waiting_runs:
+    st.success("Nothing is waiting. All emails are handled.")
+for run in waiting_runs:
+    show_waiting_run(run)
+
+st.divider()
+
+st.header("Needs review")
+if not review_runs:
+    st.success("No problems to review.")
+for run in review_runs:
+    show_review_run(run)
