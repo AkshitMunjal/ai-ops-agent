@@ -1,0 +1,15 @@
+From: Rakesh Gupta <gupta@example.com>
+To: orders@example.com
+Subject: Order for this week
+Date: Wed, 28 Oct 2026 10:15:00 +0530
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+MIME-Version: 1.0
+
+Hi,
+
+This is Gupta Stores. Please send us 40 steel bolts M8 and
+3 rolls of copper wire 2.5mm by next week.
+
+Thanks,
+Rakesh

@@ -4,7 +4,7 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 
 ## What it does
 
-1. A customer email arrives.
+1. A customer email arrives, as text or as an `.eml` file. A PDF purchase order attached to it is read too.
 2. An LLM extracts the customer and the items, and Pydantic checks the result.
 3. The names are matched against the ERP. Exactly one match is used. Zero or several matches go to human review.
 4. A **draft** order is created through a role-checked, logged tool.
@@ -35,6 +35,7 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 | `database/` | Tables, sessions, sample data, audit log |
 | `mcp_server/` | MCP server: roles, ERP client, tools, audit wrapper, stdio runner |
 | `extraction/` | Email to structured order: LLM client, extractor, matcher |
+| `intake/` | Reads saved emails (`.eml`) and their PDF attachments, and watches an `inbox` folder for new ones |
 | `agent/` | LangGraph flow: state, nodes, graph, saved pauses, human-only actions |
 | `agent_api/` | Run history and approval API (start a run, decide, dismiss) |
 | `ui/` | Streamlit approve page |
@@ -71,6 +72,16 @@ python -m streamlit run ui/approve_page.py
 
 Then open `http://localhost:8501`. To send an email through the agent, open `http://127.0.0.1:8001/docs` and use `POST /runs` with an `email_text`.
 
+### Feed emails to the agent
+
+Put `.eml` files into an `inbox` folder, then run:
+
+```
+python -m intake.inbox_watcher --watch
+```
+
+Every 10 seconds it takes up to 3 waiting emails (oldest first), reads the text and any PDF attachment, and sends it to the agent API. Handled emails move to `inbox/done`, broken ones to `inbox/failed`. If the agent API is not running, the emails stay in `inbox`. Drop `--watch` to check just once.
+
 ## Use the MCP server with Claude Desktop
 
 The MCP server runs as its own program over stdio. Each agent key gets only the tools its role allows. Agent keys and roles are defined in `mcp_server/roles.py`.
@@ -100,11 +111,11 @@ Add this to `claude_desktop_config.json`, with your own paths:
 python -m pytest -q -p no:warnings
 ```
 
-88 tests. The LLM and the ERP calls are replaced with fakes in the agent tests, so they are fast, free and repeatable.
+104 tests. The LLM and the ERP calls are replaced with fakes in the agent and intake tests, so they are fast, free and repeatable.
 
 ## Roadmap
 
-- Read emails from a mailbox and text from PDF attachments
+- Read emails from a real mailbox (Gmail)
 - Evals with sample emails, run before each release
 - Cost estimate and spend limits for the LLM
 - Docker and tests on every push
