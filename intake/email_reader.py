@@ -2,6 +2,7 @@ import html
 import re
 from email import policy
 from email.parser import BytesParser
+
 from intake.pdf_reader import PdfTextError, read_pdf_bytes
 
 
@@ -53,9 +54,8 @@ def get_attachment_text(message):
     return attachment_texts
 
 
-def read_email_file(eml_path):
-    with open(eml_path, "rb") as email_file:
-        message = BytesParser(policy=policy.default).parse(email_file)
+def read_email_bytes(raw_email):
+    message = BytesParser(policy=policy.default).parsebytes(raw_email)
 
     header_text = f"From: {message['from']}\nSubject: {message['subject']}"
 
@@ -63,3 +63,10 @@ def read_email_file(eml_path):
     parts.extend(get_attachment_text(message))
 
     return "\n\n".join(parts)
+
+
+def read_email_file(eml_path):
+    with open(eml_path, "rb") as email_file:
+        raw_email = email_file.read()
+
+    return read_email_bytes(raw_email)

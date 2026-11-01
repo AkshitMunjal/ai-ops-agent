@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from langgraph.types import Command
 from sqlalchemy import select
 
@@ -17,10 +17,23 @@ def thread_config(run_id):
     return {"configurable": {"thread_id": f"run-{run_id}"}}
 
 
+def find_run_by_message_id(database_session, message_id):
+    statement = select(Run).where(Run.message_id == message_id)
+    found_runs = database_session.scalars(statement)
+    return found_runs.first()
+
+
 @router.post("/runs", response_model=RunOut, status_code=201)
-def start_run(new_run: NewRun):
+def start_run(new_run: NewRun, response: Response):
     with open_session() as database_session:
-        run = Run(email_text=new_run.email_text)
+        if new_run.message_id is not None:
+            existing_run = find_run_by_message_id(database_session, new_run.message_id)
+
+            if existing_run is not None:
+                response.status_code = 200
+                return RunOut.model_validate(existing_run)
+
+        run = Run(email_text=new_run.email_text, message_id=new_run.message_id)
         database_session.add(run)
         database_session.commit()
         database_session.refresh(run)

@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class NewRun(BaseModel):
     email_text: str = Field(min_length=1)
+    message_id: str | None = None
 
 
 class Decision(BaseModel):
