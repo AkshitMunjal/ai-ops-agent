@@ -6,6 +6,9 @@ from extraction.schemas import ExtractedOrder
 extraction_instruction = """You read customer emails and extract the order.
 customer_name is the company or shop placing the order, not the
 person who signed the email. If only a person's name is given, use that.
+product_name is only the product, never the quantity. A quantity can be
+a number, a word, or written like "x 10". For example "nails x 10" means
+product_name "nails" and quantity 10.
 Reply with JSON only, no other text, in exactly this shape:
 {"customer_name": "...", "lines": [{"product_name": "...", "quantity": 0}]}"""
 

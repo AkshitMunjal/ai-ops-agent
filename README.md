@@ -41,6 +41,7 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 | `agent/` | LangGraph flow: state, nodes, graph, saved pauses, human-only actions |
 | `agent_api/` | Run history and approval API (start a run, decide, dismiss) |
 | `ui/` | Streamlit approve page |
+| `evals/` | Scored check of the LLM extraction on sample emails |
 | `tests/` | pytest tests |
 | `docs/images/` | Images used in this README |
 
@@ -134,11 +135,20 @@ Add this to `claude_desktop_config.json`, with your own paths:
 python -m pytest -q -p no:warnings
 ```
 
-122 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent and intake tests, so they are fast, free and repeatable.
+128 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent, intake and eval tests, so they are fast, free and repeatable.
+
+## Evals
+
+The tests above check the code. The evals check the LLM. Sample emails with the correct answer for each (customer, products, quantities) are in `evals/cases.py`. The runner sends every email to the real extractor and compares the answer with the expected one:
+
+```
+python -m evals.run_evals
+```
+
+It prints PASS or FAIL for each case with the reason, then the score. The command exits with an error if the score is below 80%, so it can block a release. Run it after every change to the extraction prompt or the model. New problem emails are added as new cases, then the prompt is changed until the score is back to 100%.
 
 ## Roadmap
 
-- Evals with sample emails, run before each release
 - Cost estimate and spend limits for the LLM
 - Docker and tests on every push
 - Stock alerts with draft reorders, invoice follow-up emails, scheduled summaries
