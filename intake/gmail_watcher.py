@@ -5,7 +5,7 @@ import httpx
 
 from intake.email_reader import read_email_bytes
 from intake.gmail_inbox import fetch_unread_emails, mark_as_failed, mark_as_read
-from intake.submit import submit_email_text
+from intake.submit import TryLaterError, submit_email_text
 
 emails_per_check = 3
 seconds_between_checks = 10
@@ -34,6 +34,9 @@ def process_one_email(one_email):
         run = submit_email_text(email_text, one_email["message_id"])
     except httpx.ConnectError:
         print(f"email {uid}: the agent API is not reachable, left unread")
+        return False
+    except TryLaterError as error:
+        print(f"email {uid}: {error}. Left unread, it will be tried again later")
         return False
     except Exception as error:
         print(f"email {uid}: failed ({error}), labelled orders-failed")

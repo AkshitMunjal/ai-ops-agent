@@ -7,6 +7,7 @@ from agent.graph import build_graph
 from agent_api.database import open_session
 from agent_api.models import Run
 from agent_api.schemas import Decision, NewRun, RunDetail, RunOut
+from cost_control.limit import SpendLimitReached, check_spend_limit
 
 router = APIRouter()
 
@@ -32,6 +33,11 @@ def start_run(new_run: NewRun, response: Response):
             if existing_run is not None:
                 response.status_code = 200
                 return RunOut.model_validate(existing_run)
+
+        try:
+            check_spend_limit()
+        except SpendLimitReached as error:
+            raise HTTPException(status_code=429, detail=str(error))
 
         run = Run(email_text=new_run.email_text, message_id=new_run.message_id)
         database_session.add(run)

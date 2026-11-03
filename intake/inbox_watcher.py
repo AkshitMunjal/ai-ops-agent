@@ -7,7 +7,7 @@ from datetime import datetime
 import httpx
 
 from intake.email_reader import read_email_file
-from intake.submit import submit_email_text
+from intake.submit import TryLaterError, submit_email_text
 
 inbox_folder = "inbox"
 done_folder = os.path.join("inbox", "done")
@@ -51,6 +51,9 @@ def process_one_email(email_path):
         run = submit_email_text(email_text)
     except httpx.ConnectError:
         print(f"{file_name}: the agent API is not reachable, left in inbox")
+        return False
+    except TryLaterError as error:
+        print(f"{file_name}: {error}. Left in inbox, it will be tried again later")
         return False
     except Exception as error:
         print(f"{file_name}: failed ({error}), moved to failed")
