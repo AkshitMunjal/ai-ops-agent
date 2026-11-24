@@ -26,3 +26,22 @@ class RunOut(BaseModel):
 
 class RunDetail(RunOut):
     understood: dict | None = None
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class ChatQuestion(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    question: str = Field(min_length=1, max_length=1000)
+    history: list[ChatMessage] = Field(default_factory=list, max_length=20)
+
+
+class ChatAnswer(BaseModel):
+    answer: str
+    known: bool
+    tools_used: list[str]
+    sources: list[str]

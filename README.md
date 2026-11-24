@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/AkshitMunjal/ai-ops-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/AkshitMunjal/ai-ops-agent/actions/workflows/tests.yml)
 
-AI agents that run the routine work of a small business ERP: order entry from customer emails, stock reorders, overdue invoice reminders and a daily summary. Agents prepare drafts, a person decides with one click. Built with MCP tools, LangGraph, FastAPI, Celery and Redis.
+AI agents that run the routine work of a small business ERP: order entry from customer emails, stock reorders, overdue invoice reminders and a daily summary. Agents prepare drafts, a person decides with one click. A chat assistant answers questions about the live data and the company policies, and says "I don't know" when it has no facts. Built with MCP tools, LangGraph, FastAPI, Celery, Redis and PostgreSQL with pgvector.
 
 ## What it does
 
@@ -27,6 +27,15 @@ Celery runs these every morning (India time). Each one reads the ERP through the
 | 08:10 | Invoice follow-ups | One draft reminder email per overdue invoice, at most one every 7 days | A person reads it and clicks Send |
 | 08:30 | Daily summary | One email to the owner: low stock, overdue invoices with the total, drafts waiting | Nobody, it is read only |
 
+**Chat assistant**
+
+A chat page next to the approve page. Ask in plain words: "Which invoices are overdue?", "How much stock of gloves do we have?", "What is our return policy?"
+
+- Live questions use the same read-only MCP tools as the agents, through their own `chat-bot` key.
+- Policy questions search the written company documents in the `knowledge/` folder. The documents are split into chunks, stored as vectors in PostgreSQL with pgvector, and searched by meaning.
+- If no tool returns facts and no document is close enough, the answer is "I don't know". The assistant never answers from the model's own memory.
+- Answers from documents name the file they came from. Every answer shows which tools were used.
+
 ## Safety rules
 
 - Agents can only create drafts. Approving, cancelling, sending an email and marking goods received are not agent tools. They are buttons on the approve page.
@@ -44,6 +53,9 @@ Celery runs these every morning (India time). Each one reads the ERP through the
 - Every Gmail message has a unique Message-ID. The same email can never create two runs or two draft orders.
 - The mailbox reader opens only one Gmail label, only unread mail received since a set date, and skips automated senders. The rest of the inbox is never touched.
 - LLM spending has a daily limit. When it is reached, no new LLM call is made and the email waits for the next day.
+- The chat assistant can only read. Its key has the `reader` role, so a call to any write tool is refused by the MCP server and logged.
+- The "I don't know" rule is enforced in code. If no tool gave real facts in a turn, the model's own text is replaced by a fixed "I don't know" message. If a tool fails, for example when the ERP is down, the answer says so instead of guessing.
+- Text found inside tool results or documents is treated as data, never as instructions.
 
 ## How the parts fit
 
@@ -60,11 +72,14 @@ Celery runs these every morning (India time). Each one reads the ERP through the
 | `cost_control/` | Saves the cost of every LLM call and enforces the daily spend limit |
 | `intake/` | Reads emails (`.eml` files and Gmail) and their PDF attachments (text or scanned), and watches an `inbox` folder or a Gmail label for new ones |
 | `agent/` | LangGraph flow: state, nodes, graph, saved pauses, human-only actions |
-| `agent_api/` | Run history and approval API (start a run, decide, dismiss) |
+| `agent_api/` | Run history and approval API (start a run, decide, dismiss) and the chat endpoint |
 | `jobs/` | The stock check, invoice follow-up and daily summary jobs, each split into planner, writer and runner files |
+| `chat/` | The chat assistant: tool-using loop, bridge to the MCP tools and the document search, the "I don't know" rule |
+| `rag/` | Document search: chunker, embeddings, pgvector storage, retriever |
 | `mailer/` | Sends email through Gmail SMTP |
 | `scheduler/` | Celery app, the daily schedule and the three tasks |
-| `ui/` | Streamlit approve page: orders, reorders, goods received, reminders, review list |
+| `ui/` | Streamlit approve page (orders, reorders, goods received, reminders, review list) and the chat page |
+| `knowledge/` | The written company policies the assistant can search (Markdown or text) |
 | `evals/` | Scored check of the LLM extraction on sample emails |
 | `tests/` | pytest tests |
 | `Dockerfile`, `docker-compose.yml` | Run everything in containers with shared storage |
@@ -100,7 +115,7 @@ uvicorn agent_api.main:app --port 8001 --reload
 python -m streamlit run ui/approve_page.py
 ```
 
-Then open `http://localhost:8501`. To send an email through the agent, open `http://127.0.0.1:8001/docs` and use `POST /runs` with an `email_text`.
+Then open `http://localhost:8501`. To send an email through the agent, open `http://127.0.0.1:8001/docs` and use `POST /runs` with an `email_text`. The chat page is in the left menu of the same page, and it needs the chat assistant setup below.
 
 ### Run the scheduled jobs
 
@@ -136,9 +151,37 @@ The same jobs can be run once, without Celery, with `python -m jobs.run_stock_ch
 | `FOLLOW_UP_TEST_RECIPIENT` | If set, every reminder goes to this address instead of the customer |
 | `SUMMARY_RECIPIENT` | Who gets the daily summary |
 
+### Chat assistant
+
+The assistant needs the vector database, which runs in Docker. Start it, create its table and store the documents from `knowledge/`:
+
+```
+docker compose up -d vectordb
+python -m rag.create_vector_tables
+python -m rag.ingest
+```
+
+Run `python -m rag.ingest` again whenever a document in `knowledge/` changes. Use a model that can call tools, for example `openai/gpt-4o-mini`, as `OPENROUTER_MODEL`. Then ask a question in the terminal, or use the chat page with the ERP (8000) and agent API (8001) running:
+
+```
+python -m chat.run_chat "Which invoices are overdue and how much is the total?"
+```
+
+To see how close the documents are to a question, and which would count as an answer:
+
+```
+python -m rag.try_search "How many days do customers have to pay an invoice?"
+```
+
+| Setting in `.env` | Meaning |
+|---|---|
+| `VECTOR_DATABASE_URL` | Where the vector database is, default `postgresql://aiops:aiops@127.0.0.1:5433/aiops_vectors` |
+| `EMBEDDING_MODEL` | Model that turns text into vectors, default `openai/text-embedding-3-small` |
+| `RAG_MIN_SIMILARITY` | How close a document must be to count as an answer, default `0.35` |
+
 ## Run it with Docker
 
-Requirements: Docker Desktop. One command starts the ERP API (port 8000), the agent API (port 8001), the approve page (port 8501), Redis, the Celery worker and Celery beat. They find each other by name, and the database files live in a Docker volume, so the data survives restarts.
+Requirements: Docker Desktop. One command starts the ERP API (port 8000), the agent API (port 8001), the approve page (port 8501), Redis, the Celery worker, Celery beat and the vector database (pgvector, port 5433). They find each other by name, and the database files live in a Docker volume, so the data survives restarts.
 
 ```
 copy .env.example .env
@@ -162,7 +205,14 @@ Then start everything:
 docker compose up -d
 ```
 
-Open `http://localhost:8501` for the approve page and `http://127.0.0.1:8001/docs` to send an email. To run a job right now inside Docker:
+The first time, create the vector table and store the documents:
+
+```
+docker compose exec agent python -m rag.create_vector_tables
+docker compose exec agent python -m rag.ingest
+```
+
+Open `http://localhost:8501` for the approve page (the chat page is in its left menu) and `http://127.0.0.1:8001/docs` to send an email. To run a job right now inside Docker:
 
 ```
 docker compose exec worker python -m scheduler.run_now daily-summary
@@ -257,7 +307,7 @@ Add this to `claude_desktop_config.json`, with your own paths:
 python -m pytest -q -p no:warnings
 ```
 
-278 tests. The LLM, the ERP calls, Gmail and the mail server are replaced with fakes in the agent, intake, cost, scanned PDF, job, mailer, scheduler and eval tests, so they are fast, free and repeatable, and they need no Redis. GitHub Actions runs the same command on every push to `main`. The tests also pass inside the Docker image:
+336 tests. The LLM, the ERP calls, Gmail and the mail server are replaced with fakes in the agent, intake, cost, scanned PDF, job, mailer, scheduler, chat and document search tests, so they are fast, free and repeatable, and they need no Redis and no vector database. GitHub Actions runs the same command on every push to `main`. The tests also pass inside the Docker image:
 
 ```
 docker run --rm ai-ops-agent python -m pytest -q -p no:warnings
@@ -275,4 +325,4 @@ It prints PASS or FAIL for each case with the reason, then the score. The comman
 
 ## Roadmap
 
-- Chat assistant over live data, with answers that say "I don't know" when the data is not there
+- Move the ERP database from SQLite to PostgreSQL

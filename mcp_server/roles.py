@@ -25,6 +25,7 @@ agents_by_key = {
     "demo-key-stock": {"name": "stock-bot", "role": "stock_agent"},
     "demo-key-followup": {"name": "followup-bot", "role": "follow_up_agent"},
     "demo-key-summary": {"name": "summary-bot", "role": "reader"},
+    "demo-key-chat": {"name": "chat-bot", "role": "reader"},
 }
 
 

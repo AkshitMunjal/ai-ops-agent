@@ -22,12 +22,16 @@ services:
       AGENT_DATABASE_URL: sqlite:////data/agent.db
       CHECKPOINT_DB: /data/agent_checkpoints.db
       ERP_API_URL: http://erp:8000
+      VECTOR_DATABASE_URL: postgresql://aiops:aiops@vectordb:5432/aiops_vectors
     volumes:
       - app_data:/data
     ports:
       - "8001:8001"
     depends_on:
-      - erp
+      erp:
+        condition: service_started
+      vectordb:
+        condition: service_healthy
 
   ui:
     image: ai-ops-agent
@@ -69,5 +73,22 @@ services:
     depends_on:
       - redis
 
+  vectordb:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: aiops
+      POSTGRES_PASSWORD: aiops
+      POSTGRES_DB: aiops_vectors
+    volumes:
+      - vector_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiops -d aiops_vectors"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   app_data:
+  vector_data:

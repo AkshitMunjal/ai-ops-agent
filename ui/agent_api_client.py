@@ -34,3 +34,14 @@ def dismiss_run(run_id):
     response.raise_for_status()
     dismissed_run = response.json()
     return dismissed_run
+
+
+def ask_assistant(question, history):
+    response = httpx.post(
+        agent_api_url + "/chat",
+        json={"question": question, "history": history},
+        timeout=120,
+    )
+    response.raise_for_status()
+    answer = response.json()
+    return answer
