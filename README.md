@@ -35,7 +35,7 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 
 ## Project layout
 
-| Folder | Job |
+| Folder or file | Job |
 |---|---|
 | `api/` | ERP REST API: customers, products, orders, invoices |
 | `database/` | Tables, sessions, sample data, audit log |
@@ -48,6 +48,7 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 | `ui/` | Streamlit approve page |
 | `evals/` | Scored check of the LLM extraction on sample emails |
 | `tests/` | pytest tests |
+| `Dockerfile`, `docker-compose.yml` | Run the ERP, the agent API and the approve page in containers with shared storage |
 | `.github/workflows/` | GitHub Actions: runs the tests on every push |
 | `docs/images/` | Images used in this README |
 
@@ -81,6 +82,41 @@ python -m streamlit run ui/approve_page.py
 ```
 
 Then open `http://localhost:8501`. To send an email through the agent, open `http://127.0.0.1:8001/docs` and use `POST /runs` with an `email_text`.
+
+## Run it with Docker
+
+Requirements: Docker Desktop. One command starts the ERP API (port 8000), the agent API (port 8001) and the approve page (port 8501). They find each other by name, and the three database files live in a Docker volume, so the data survives restarts.
+
+```
+copy .env.example .env
+```
+
+Open `.env` and set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`. The addresses in `.env` are overridden inside Docker, and `.env` itself is never copied into the image.
+
+The first time only, build the image and create the tables and sample data. Run the sample data command **once**, because running it again adds every customer and product a second time:
+
+```
+docker compose build
+docker compose run --rm erp python -m database.create_tables
+docker compose run --rm erp python -m database.seed_data
+```
+
+Then start everything:
+
+```
+docker compose up -d
+```
+
+Open `http://localhost:8501` for the approve page and `http://127.0.0.1:8001/docs` to send an email.
+
+| Command | What it does |
+|---|---|
+| `docker compose ps` | Shows which programs are running |
+| `docker compose logs agent --tail 30` | Shows the last lines of the agent API log |
+| `docker compose down` | Stops everything and keeps the data |
+| `docker compose down -v` | Stops everything and deletes the data |
+
+The folder and Gmail watchers can run on your computer while the programs run in Docker. They send to `http://127.0.0.1:8001`, which Docker publishes.
 
 ### Feed emails from a folder
 
@@ -161,7 +197,11 @@ Add this to `claude_desktop_config.json`, with your own paths:
 python -m pytest -q -p no:warnings
 ```
 
-172 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent, intake, cost, scanned PDF and eval tests, so they are fast, free and repeatable. GitHub Actions runs the same command on every push to `main`.
+172 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent, intake, cost, scanned PDF and eval tests, so they are fast, free and repeatable. GitHub Actions runs the same command on every push to `main`. The tests also pass inside the Docker image:
+
+```
+docker run --rm ai-ops-agent python -m pytest -q -p no:warnings
+```
 
 ## Evals
 
@@ -175,6 +215,5 @@ It prints PASS or FAIL for each case with the reason, then the score. The comman
 
 ## Roadmap
 
-- Docker
 - Stock alerts with draft reorders, invoice follow-up emails, scheduled summaries
 - Chat assistant over live data, with answers that say "I don't know" when the data is not there

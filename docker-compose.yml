@@ -1,0 +1,40 @@
+services:
+  erp:
+    build: .
+    image: ai-ops-agent
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    environment:
+      DATABASE_URL: sqlite:////data/erp.db
+    volumes:
+      - app_data:/data
+    ports:
+      - "8000:8000"
+
+  agent:
+    image: ai-ops-agent
+    command: uvicorn agent_api.main:app --host 0.0.0.0 --port 8001
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////data/erp.db
+      AGENT_DATABASE_URL: sqlite:////data/agent.db
+      CHECKPOINT_DB: /data/agent_checkpoints.db
+      ERP_API_URL: http://erp:8000
+    volumes:
+      - app_data:/data
+    ports:
+      - "8001:8001"
+    depends_on:
+      - erp
+
+  ui:
+    image: ai-ops-agent
+    command: python -m streamlit run ui/approve_page.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+    environment:
+      AGENT_API_URL: http://agent:8001
+    ports:
+      - "8501:8501"
+    depends_on:
+      - agent
+
+volumes:
+  app_data:
