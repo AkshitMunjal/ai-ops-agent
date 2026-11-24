@@ -100,6 +100,7 @@ def test_approving_the_same_order_twice_is_refused(client):
 
     assert second_response.status_code == 409
 
+
 def test_approving_an_already_approved_order_is_refused(client):
     response = client.post("/orders/1/approve")
 
@@ -110,3 +111,56 @@ def test_approving_a_missing_order_returns_404(client):
     response = client.post("/orders/99/approve")
 
     assert response.status_code == 404
+
+
+def test_cancelling_a_draft_order_changes_the_same_order(client):
+    new_order = {"customer_id": 1, "lines": [{"product_id": 3, "quantity": 5}]}
+    client.post("/orders", json=new_order)
+
+    cancel_response = client.post("/orders/2/cancel")
+    cancelled_order = cancel_response.json()
+
+    assert cancel_response.status_code == 200
+    assert cancelled_order["status"] == "cancelled"
+
+    read_response = client.get("/orders/2")
+    saved_order = read_response.json()
+
+    assert saved_order["status"] == "cancelled"
+
+
+def test_cancelling_the_same_order_twice_is_refused(client):
+    new_order = {"customer_id": 1, "lines": [{"product_id": 3, "quantity": 5}]}
+    client.post("/orders", json=new_order)
+    client.post("/orders/2/cancel")
+
+    second_response = client.post("/orders/2/cancel")
+
+    assert second_response.status_code == 409
+
+
+def test_cancelling_an_approved_order_is_refused_and_it_stays_approved(client):
+    response = client.post("/orders/1/cancel")
+
+    assert response.status_code == 409
+
+    read_response = client.get("/orders/1")
+    saved_order = read_response.json()
+
+    assert saved_order["status"] == "approved"
+
+
+def test_cancelling_a_missing_order_returns_404(client):
+    response = client.post("/orders/99/cancel")
+
+    assert response.status_code == 404
+
+
+def test_a_cancelled_order_cannot_be_approved_later(client):
+    new_order = {"customer_id": 1, "lines": [{"product_id": 3, "quantity": 5}]}
+    client.post("/orders", json=new_order)
+    client.post("/orders/2/cancel")
+
+    approve_response = client.post("/orders/2/approve")
+
+    assert approve_response.status_code == 409

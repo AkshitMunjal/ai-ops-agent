@@ -1,7 +1,6 @@
-from mcp.server import MCPServer
-
 from mcp_server import tools
 from mcp_server.audit_wrapper import wrap_tool_with_audit
+from mcp_server.audited_server import AuditedServer
 from mcp_server.roles import find_agent
 from mcp_server.roles import is_tool_allowed
 
@@ -26,7 +25,7 @@ def build_server(api_key):
     agent_name = agent["name"]
     role = agent["role"]
 
-    server = MCPServer("ERP")
+    server = AuditedServer("ERP", agent_name, role)
 
     for tool_function in all_tools:
         tool_name = tool_function.__name__
@@ -35,7 +34,6 @@ def build_server(api_key):
             continue
 
         wrapped_tool = wrap_tool_with_audit(tool_function, agent_name, role)
-        tool_decorator = server.tool()
-        tool_decorator(wrapped_tool)
+        server.add_visible_tool(wrapped_tool)
 
     return server

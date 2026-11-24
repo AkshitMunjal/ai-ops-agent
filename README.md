@@ -4,23 +4,24 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 
 ## What it does
 
-1. A customer email arrives, as text, as an `.eml` file, or in a Gmail label. A PDF purchase order attached to it is read too.
+1. A customer email arrives, as text, as an `.eml` file, or in a Gmail label. A PDF purchase order attached to it is read too, even a scanned one.
 2. An LLM extracts the customer and the items, and Pydantic checks the result.
 3. The names are matched against the ERP. Exactly one match is used. Zero or several matches go to human review.
 4. A **draft** order is created through a role-checked, logged tool.
 5. The flow pauses. A person approves or rejects on a Streamlit page.
-6. Only after the person approves does the ERP approve endpoint run.
+6. Only after the person approves does the ERP approve endpoint run. A rejected draft is cancelled in the ERP.
 
 ![How an email becomes an approved order, and how an unclear one is stopped](docs/images/how-it-works.gif)
 
 ## Safety rules
 
-- Agents can only create drafts. Approving an order is not an agent tool.
+- Agents can only create drafts. Approving or cancelling an order is not an agent tool.
 - Prices always come from the database. The caller cannot set them.
 - An unclear match is never guessed. It goes to a human review list.
 - Every tool call is logged: who called it, which tool, with what input, and the outcome (`allowed`, `refused`, `error`). The log is append-only.
-- Each agent role sees only its own tools (`reader`, `order_agent`, `finance_agent`).
-- Orders are all-or-nothing. Only draft orders can be approved. Only unpaid invoices can be marked paid.
+- Each agent role sees only its own tools (`reader`, `order_agent`, `finance_agent`). A call to a tool outside the role, or to a tool that does not exist, is refused and written to the audit log.
+- If the ERP cannot be reached, the tools answer with one clear message and the audit log records an `error`.
+- Orders are all-or-nothing. Only draft orders can be approved or cancelled. Only unpaid invoices can be marked paid.
 - The paused state is saved in a database, so an approval can wait for hours and survive a restart.
 - Every Gmail message has a unique Message-ID. The same email can never create two runs or two draft orders.
 - The mailbox reader opens only one Gmail label, only unread mail received since a set date, and skips automated senders. The rest of the inbox is never touched.
@@ -36,10 +37,10 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 |---|---|
 | `api/` | ERP REST API: customers, products, orders, invoices |
 | `database/` | Tables, sessions, sample data, audit log |
-| `mcp_server/` | MCP server: roles, ERP client, tools, audit wrapper, stdio runner |
-| `extraction/` | Email to structured order: LLM client, extractor, matcher |
+| `mcp_server/` | MCP server: roles, ERP client, tools, audit wrapper, a server that logs refused calls, stdio runner |
+| `extraction/` | Email to structured order: LLM client (text and pictures), extractor, matcher |
 | `cost_control/` | Saves the cost of every LLM call and enforces the daily spend limit |
-| `intake/` | Reads emails (`.eml` files and Gmail) and their PDF attachments, and watches an `inbox` folder or a Gmail label for new ones |
+| `intake/` | Reads emails (`.eml` files and Gmail) and their PDF attachments (text or scanned), and watches an `inbox` folder or a Gmail label for new ones |
 | `agent/` | LangGraph flow: state, nodes, graph, saved pauses, human-only actions |
 | `agent_api/` | Run history and approval API (start a run, decide, dismiss) |
 | `ui/` | Streamlit approve page |
@@ -58,7 +59,7 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Open `.env` and set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (a model name ending in `:free` works).
+Open `.env` and set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (a model name ending in `:free` works for text emails. Reading scanned PDFs needs a model that accepts pictures, for example `openai/gpt-4o-mini`).
 
 Create the ERP tables and sample data:
 
@@ -109,6 +110,14 @@ python -m intake.gmail_watcher --watch
 
 Every 10 seconds it takes up to 3 unread emails from the label, sends them to the agent API with their Message-ID, and marks each as read only after the API accepted it. If the agent API is down or the daily spend limit is reached, the email stays unread and is retried. An email that fails for any other reason gets the Gmail label `orders-failed`, so it is never retried forever. Drop `--watch` to check just once.
 
+### Scanned PDFs
+
+Many customers send a scan or a photo of a printed purchase order. Such a PDF has no text inside, only pictures of pages. The reader first tries to read normal text. If there is none, it turns each page into a small picture and asks the AI model to read the text, then the normal flow continues.
+
+- A scanned PDF over 5 pages is not guessed at. It goes to a person.
+- If the AI service is busy or down, or the daily spend limit is reached, the email waits and is tried again later, like any other email.
+- `OCR_IMAGE_DETAIL` in `.env` sets the picture quality sent to the AI. `low` (default) costs about $0.0005 per page. `high` costs about $0.0056 per page and suits small or crowded print.
+
 ## Cost control
 
 Every LLM call saves its token counts and its cost (in USD, as reported by OpenRouter) in the `llm_usage` table. Before each call, the app adds up what was spent since midnight and refuses the call if the daily limit is reached.
@@ -118,7 +127,7 @@ Every LLM call saves its token counts and its cost (in USD, as reported by OpenR
 - An email that was already handled still returns its old result, even at the limit, because it costs nothing.
 - If saving the usage ever fails, the answer is still returned. The order flow is never broken by the bookkeeping.
 
-Estimated cost with `openai/gpt-4o-mini`: about $0.00005 per email, so about $0.05 per 1,000 emails. At that price the default $1.00 limit allows roughly 20,000 emails a day, so it works as a safety net against a loop or a flood, not as a daily restriction.
+Estimated cost with `openai/gpt-4o-mini`: about $0.00005 per text email, so about $0.05 per 1,000 emails, and about $0.0005 per scanned page. At those prices the default $1.00 limit allows roughly 20,000 text emails a day, so it works as a safety net against a loop or a flood, not as a daily restriction.
 
 ## Use the MCP server with Claude Desktop
 
@@ -149,7 +158,7 @@ Add this to `claude_desktop_config.json`, with your own paths:
 python -m pytest -q -p no:warnings
 ```
 
-144 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent, intake, cost and eval tests, so they are fast, free and repeatable.
+172 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent, intake, cost, scanned PDF and eval tests, so they are fast, free and repeatable.
 
 ## Evals
 

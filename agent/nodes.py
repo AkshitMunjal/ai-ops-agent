@@ -1,7 +1,7 @@
 import httpx
 from langgraph.types import interrupt
 from mcp.server.mcpserver.exceptions import ToolError
-from agent.human_actions import approve_order_in_erp
+from agent.human_actions import approve_order_in_erp, cancel_order_in_erp
 from extraction.extractor import ExtractionError, extract_order
 from extraction.matcher import match_order
 from extraction.pipeline import audited_create_draft_order
@@ -78,4 +78,11 @@ def approve_order_node(state):
 
 
 def reject_node(state):
-    return {"status": "rejected"}
+    draft_order_id = state["draft_order"]["id"]
+
+    try:
+        cancelled_order = cancel_order_in_erp(draft_order_id)
+    except httpx.HTTPStatusError as error:
+        return {"problems": [str(error)], "status": "rejected"}
+
+    return {"draft_order": cancelled_order, "status": "rejected"}

@@ -133,3 +133,31 @@ def test_wrapper_refuses_a_tool_outside_the_role_and_logs_it(client):
     assert first_row.who == "order-bot"
     assert first_row.tool_name == "mark_invoice_paid"
     assert first_row.outcome == "refused"
+
+
+def test_calling_a_hidden_tool_is_refused_and_logged(client):
+    result = call_tool_as("demo-key-reader", "mark_invoice_paid", {"invoice_id": 1})
+    audit_rows = read_audit_rows()
+
+    assert result.is_error is True
+    assert len(audit_rows) == 1
+
+    first_row = audit_rows[0]
+
+    assert first_row.who == "reader-bot"
+    assert first_row.tool_name == "mark_invoice_paid"
+    assert first_row.outcome == "refused"
+
+
+def test_calling_a_tool_that_does_not_exist_is_refused_and_logged(client):
+    result = call_tool_as("demo-key-orders", "approve_order", {"order_id": 1})
+    audit_rows = read_audit_rows()
+
+    assert result.is_error is True
+    assert len(audit_rows) == 1
+
+    first_row = audit_rows[0]
+
+    assert first_row.who == "order-bot"
+    assert first_row.tool_name == "approve_order"
+    assert first_row.outcome == "refused"

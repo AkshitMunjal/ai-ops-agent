@@ -109,3 +109,23 @@ def approve_order(order_id: int):
         approved_order_status = order.status
 
     return {"id": approved_order_id, "status": approved_order_status}
+
+
+@router.post("/orders/{order_id}/cancel")
+def cancel_order(order_id: int):
+    with open_session() as database_session:
+        order = database_session.get(Order, order_id)
+
+        if order is None:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        if order.status != "draft":
+            raise HTTPException(status_code=409, detail="Only draft orders can be cancelled")
+
+        order.status = "cancelled"
+        database_session.commit()
+
+        cancelled_order_id = order.id
+        cancelled_order_status = order.status
+
+    return {"id": cancelled_order_id, "status": cancelled_order_status}

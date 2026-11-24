@@ -1,5 +1,6 @@
 import functools
 
+import httpx
 from mcp.server.mcpserver.exceptions import ToolError
 
 from database.audit import write_audit_log
@@ -17,6 +18,9 @@ def wrap_tool_with_audit(tool_function, agent_name, role):
 
         try:
             result = tool_function(**tool_input)
+        except httpx.RequestError:
+            write_audit_log(agent_name, tool_name, tool_input, "error")
+            raise ToolError("The ERP is not reachable right now. Try again later.")
         except Exception:
             write_audit_log(agent_name, tool_name, tool_input, "error")
             raise

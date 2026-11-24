@@ -11,8 +11,7 @@ load_dotenv()
 openrouter_url = "https://openrouter.ai/api/v1/chat/completions"
 
 
-def ask_llm(system_instruction, user_text):
-
+def send_to_llm(messages, timeout_seconds):
     # Check if the daily spend limit has been reached
     check_spend_limit()
 
@@ -24,13 +23,10 @@ def ask_llm(system_instruction, user_text):
     body = {
         "model": model_name,
         "temperature": 0,
-        "messages": [
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": user_text},
-        ],
+        "messages": messages,
     }
 
-    response = httpx.post(openrouter_url, headers=headers, json=body, timeout=60)
+    response = httpx.post(openrouter_url, headers=headers, json=body, timeout=timeout_seconds)
     response.raise_for_status()
 
     data = response.json()
@@ -45,3 +41,29 @@ def ask_llm(system_instruction, user_text):
     first_choice = choices[0]
     message = first_choice["message"]
     return message["content"]
+
+
+def ask_llm(system_instruction, user_text):
+    messages = [
+        {"role": "system", "content": system_instruction},
+        {"role": "user", "content": user_text},
+    ]
+    return send_to_llm(messages, 60)
+
+
+def ask_llm_with_pictures(system_instruction, picture_links):
+    picture_detail = os.environ.get("OCR_IMAGE_DETAIL", "low")
+
+    user_parts = []
+    for picture_link in picture_links:
+        picture_part = {
+            "type": "image_url",
+            "image_url": {"url": picture_link, "detail": picture_detail},
+        }
+        user_parts.append(picture_part)
+
+    messages = [
+        {"role": "system", "content": system_instruction},
+        {"role": "user", "content": user_parts},
+    ]
+    return send_to_llm(messages, 120)
