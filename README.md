@@ -1,5 +1,7 @@
 ![ai-ops-agent](docs/images/banner.png)
 
+[![Tests](https://github.com/AkshitMunjal/ai-ops-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/AkshitMunjal/ai-ops-agent/actions/workflows/tests.yml)
+
 AI agents that automate order entry for a small business ERP. An agent reads a customer email, drafts the order, and a person approves it with one click. Built with MCP tools, LangGraph and FastAPI.
 
 ## What it does
@@ -46,6 +48,7 @@ AI agents that automate order entry for a small business ERP. An agent reads a c
 | `ui/` | Streamlit approve page |
 | `evals/` | Scored check of the LLM extraction on sample emails |
 | `tests/` | pytest tests |
+| `.github/workflows/` | GitHub Actions: runs the tests on every push |
 | `docs/images/` | Images used in this README |
 
 ## Run it locally
@@ -158,7 +161,7 @@ Add this to `claude_desktop_config.json`, with your own paths:
 python -m pytest -q -p no:warnings
 ```
 
-172 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent, intake, cost, scanned PDF and eval tests, so they are fast, free and repeatable.
+172 tests. The LLM, the ERP calls and Gmail are replaced with fakes in the agent, intake, cost, scanned PDF and eval tests, so they are fast, free and repeatable. GitHub Actions runs the same command on every push to `main`.
 
 ## Evals
 
@@ -172,6 +175,6 @@ It prints PASS or FAIL for each case with the reason, then the score. The comman
 
 ## Roadmap
 
-- Docker and tests on every push
+- Docker
 - Stock alerts with draft reorders, invoice follow-up emails, scheduled summaries
 - Chat assistant over live data, with answers that say "I don't know" when the data is not there
