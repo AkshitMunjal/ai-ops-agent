@@ -36,6 +36,8 @@ A chat page next to the approve page. Ask in plain words: "Which invoices are ov
 - If no tool returns facts and no document is close enough, the answer is "I don't know". The assistant never answers from the model's own memory.
 - Answers from documents name the file they came from. Every answer shows which tools were used.
 
+![The chat page answering a live stock question and a policy question](docs/images/ask-assistant.png)
+
 ## Safety rules
 
 - Agents can only create drafts. Approving, cancelling, sending an email and marking goods received are not agent tools. They are buttons on the approve page.
@@ -60,6 +62,8 @@ A chat page next to the approve page. Ask in plain words: "Which invoices are ov
 ## How the parts fit
 
 ![Architecture: email, agent API, LLM, ERP API, MCP server and approve page](docs/images/architecture.png)
+
+The picture shows the order flow. The scheduled jobs (Celery) and the chat assistant use the same MCP tools and the same ERP API, each with its own agent key and role. The chat assistant also searches the documents in `knowledge/`, stored in the pgvector database.
 
 ## Project layout
 
@@ -97,7 +101,7 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-Open `.env` and set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (a model name ending in `:free` works for text emails. Reading scanned PDFs needs a model that accepts pictures, for example `openai/gpt-4o-mini`). To send reminder emails and the summary, also set `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` and `SUMMARY_RECIPIENT`.
+Open `.env` and set `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`. The example uses `openai/gpt-4o-mini`, which reads scanned PDFs and can call tools for the chat assistant. A model name ending in `:free` works for text emails only. To send reminder emails and the summary, also set `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` and `SUMMARY_RECIPIENT`.
 
 Create the ERP tables and sample data:
 
