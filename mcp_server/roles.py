@@ -5,18 +5,26 @@ read_tools = [
     "list_low_stock_products",
     "list_overdue_invoices",
     "get_invoice",
+    "list_draft_reorders",
+    "list_open_reorders",
+    "list_follow_ups",
 ]
 
 role_permissions = {
     "reader": read_tools,
     "order_agent": read_tools + ["create_draft_order"],
     "finance_agent": read_tools + ["mark_invoice_paid"],
+    "stock_agent": read_tools + ["create_draft_reorder"],
+    "follow_up_agent": read_tools + ["create_draft_follow_up"],
 }
 
 agents_by_key = {
     "demo-key-reader": {"name": "reader-bot", "role": "reader"},
     "demo-key-orders": {"name": "order-bot", "role": "order_agent"},
     "demo-key-finance": {"name": "finance-bot", "role": "finance_agent"},
+    "demo-key-stock": {"name": "stock-bot", "role": "stock_agent"},
+    "demo-key-followup": {"name": "followup-bot", "role": "follow_up_agent"},
+    "demo-key-summary": {"name": "summary-bot", "role": "reader"},
 }
 
 

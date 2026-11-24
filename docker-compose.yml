@@ -5,6 +5,9 @@ services:
     command: uvicorn api.main:app --host 0.0.0.0 --port 8000
     environment:
       DATABASE_URL: sqlite:////data/erp.db
+      GMAIL_ADDRESS: ${GMAIL_ADDRESS:-}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      FOLLOW_UP_TEST_RECIPIENT: ${FOLLOW_UP_TEST_RECIPIENT:-}
     volumes:
       - app_data:/data
     ports:
@@ -31,10 +34,40 @@ services:
     command: python -m streamlit run ui/approve_page.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
     environment:
       AGENT_API_URL: http://agent:8001
+      ERP_API_URL: http://erp:8000
     ports:
       - "8501:8501"
     depends_on:
       - agent
+      - erp
+
+  redis:
+    image: redis:7-alpine
+
+  worker:
+    image: ai-ops-agent
+    command: celery -A scheduler.celery_app worker --loglevel=info --concurrency=1
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////data/erp.db
+      ERP_API_URL: http://erp:8000
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - app_data:/data
+    depends_on:
+      - redis
+      - erp
+
+  beat:
+    image: ai-ops-agent
+    command: celery -A scheduler.celery_app beat --loglevel=info --schedule /data/celerybeat-schedule
+    env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - app_data:/data
+    depends_on:
+      - redis
 
 volumes:
   app_data:

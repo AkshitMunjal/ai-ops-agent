@@ -9,9 +9,14 @@ all_tools = [
     tools.find_product,
     tools.list_low_stock_products,
     tools.list_overdue_invoices,
+    tools.list_draft_reorders,
+    tools.list_open_reorders,
+    tools.list_follow_ups,
     tools.get_order,
     tools.get_invoice,
     tools.create_draft_order,
+    tools.create_draft_reorder,
+    tools.create_draft_follow_up,
     tools.mark_invoice_paid,
 ]
 

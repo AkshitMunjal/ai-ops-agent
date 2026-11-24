@@ -12,3 +12,5 @@ streamlit==1.66.1
 pypdf==6.21.4
 pypdfium2==5.15.2
 pillow==13.0.0
+celery==5.7.0
+redis==8.2.0

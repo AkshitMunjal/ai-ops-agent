@@ -5,3 +5,6 @@ from database.models.order import Order
 from database.models.order_item import OrderItem
 from database.models.invoice import Invoice
 from database.models.audit_log import AuditLog
+from database.models.purchase_order import PurchaseOrder
+from database.models.purchase_order_item import PurchaseOrderItem
+from database.models.follow_up_draft import FollowUpDraft
